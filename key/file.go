@@ -2,7 +2,6 @@ package key
 
 import (
 	"bufio"
-	"client/model"
 	"crypto/ecdsa"
 	"crypto/x509"
 	"encoding/pem"
@@ -10,6 +9,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"privacy-client/model"
 )
 
 // StoreKey 密钥存储到文件

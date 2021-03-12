@@ -1,10 +1,10 @@
 package key
 
 import (
-	"client/model"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"privacy-client/model"
 )
 
 // Enroll 注册用户

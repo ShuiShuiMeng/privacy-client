@@ -1,11 +1,11 @@
 package ecc
 
 import (
-	"client/model"
 	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"privacy-client/model"
 )
 
 // Encrypt 加密函数

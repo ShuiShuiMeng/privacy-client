@@ -1,4 +1,4 @@
-module client
+module privacy-client
 
 go 1.14
 

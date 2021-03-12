@@ -2,10 +2,10 @@ package ecc
 
 import (
 	"bytes"
-	"client/model"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
+	"privacy-client/model"
 )
 
 // Sign 生成签名

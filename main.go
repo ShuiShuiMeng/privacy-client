@@ -1,10 +1,6 @@
 package main
 
 import (
-	"client/ecc"
-	"client/key"
-	"client/model"
-	"client/utils"
 	"crypto/elliptic"
 	"fmt"
 	"io/ioutil"
@@ -12,6 +8,10 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"privacy-client/ecc"
+	"privacy-client/key"
+	"privacy-client/model"
+	"privacy-client/utils"
 	"strconv"
 	"time"
 )

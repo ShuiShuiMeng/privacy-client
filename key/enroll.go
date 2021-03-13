@@ -39,5 +39,11 @@ func Enroll(user *model.User) error {
 	if err != nil {
 		return err
 	}
+	// 生成共享通道
+	user.ShareC, err = CalcChannel(user)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

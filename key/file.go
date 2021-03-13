@@ -16,7 +16,7 @@ import (
 func StoreKey(private *ecdsa.PrivateKey, name string) error {
 	// 存储私钥文件
 	priKeyPath := filepath.Join(
-		"..",
+		".",
 		"wallet",
 		"key"+name+".pem",
 	)
@@ -26,7 +26,7 @@ func StoreKey(private *ecdsa.PrivateKey, name string) error {
 	}
 	// 存储公钥文件
 	pubKeyPath := filepath.Join(
-		"..",
+		".",
 		"wallet",
 		"pub_key"+name+".pem",
 	)
@@ -102,7 +102,7 @@ func SaveRandKey(r, RX, RY *big.Int, user *model.User) error {
 		Y: new(big.Int).Set(RY),
 	}
 	// 保存至文件
-	randKeyPath := filepath.Join("..", "wallet", "randomKey")
+	randKeyPath := filepath.Join(".", "wallet", "randomKey")
 	file, err := os.Create(filepath.Clean(randKeyPath))
 	if err != nil {
 		return err

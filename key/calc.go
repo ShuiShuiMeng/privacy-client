@@ -1,14 +1,24 @@
 package key
 
 import (
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"privacy-client/model"
 
 	"github.com/itchyny/base58-go"
 	"golang.org/x/crypto/ripemd160"
 )
+
+func minus(curve elliptic.Curve, x1, y1, x2, y2 *big.Int) (*big.Int, *big.Int) {
+	tmp := big.NewInt(0)
+	tmp = tmp.Sub(tmp, y2)
+	x, y := curve.Add(x1, y1, x2, tmp)
+	return x, y
+}
 
 // CalcPubAddress 生成公钥地址
 func CalcPubAddress(pubX, pubY *big.Int) (string, error) {
@@ -46,4 +56,34 @@ func CalcPubAddress(pubX, pubY *big.Int) (string, error) {
 		return "", err
 	}
 	return string(encoded), nil
+}
+
+// CalcK 计算密钥差值
+func CalcK(sc *model.ShareChannel, user *model.User) (KX, KY *big.Int, err error) {
+	curve := elliptic.P256()
+	// 生成新的随机密钥
+	r, _ := rand.Int(rand.Reader, curve.Params().N)
+	RX, RY := curve.ScalarBaseMult(r.Bytes())
+
+	tmpX, tmpY := curve.ScalarMult(sc.PubX, sc.PubY, r.Bytes()) // r'E
+	tmpX, tmpY = curve.Add(tmpX, tmpY, sc.X, sc.Y)              // dE+r'E
+
+	tmpX1, tmpY1 := curve.Add(user.PubKeyA.X, user.PubKeyA.Y, RX, RY)     // A+R1
+	tmpX1, tmpY1 = curve.ScalarMult(tmpX1, tmpY1, user.PriKeyB.D.Bytes()) // b(A+R1)
+	KX, KY = minus(curve, tmpX, tmpY, tmpX1, tmpY1)                       // K=dE+r2E-b(A+R1)
+
+	return KX, KY, err
+}
+
+// CalcChannel 计算共享通道
+func CalcChannel(user *model.User) (*model.ShareChannel, error) {
+	curve := elliptic.P256()
+	shareX, shareY := curve.ScalarMult(user.PubKeyB.X, user.PubKeyB.Y, user.PriKeyA.D.Bytes())
+	shareC := &model.ShareChannel{
+		X:    shareX,
+		Y:    shareY,
+		PubX: user.PubKeyB.X,
+		PubY: user.PubKeyB.Y,
+	}
+	return shareC, nil
 }

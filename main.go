@@ -1,9 +1,9 @@
 package main
 
 import (
-	"crypto/elliptic"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"net/http"
 	"net/url"
 	"os"
@@ -19,8 +19,8 @@ import (
 // 本地密钥初始化
 func initKeys(user *model.User) error {
 	// 检查是否有公钥
-	keyAPath := filepath.Join("..", "wallet", "keyA.pem")
-	keyBPath := filepath.Join("..", "wallet", "keyB.pem")
+	keyAPath := filepath.Join(".", "wallet", "keyA.pem")
+	keyBPath := filepath.Join(".", "wallet", "keyB.pem")
 	keyAExist := utils.FileExist(filepath.Clean(keyAPath))
 	keyBExist := utils.FileExist(filepath.Clean(keyBPath))
 	if keyAExist && keyBExist {
@@ -47,7 +47,7 @@ func initKeys(user *model.User) error {
 // 随机密钥初始化
 func initRandKey(user *model.User) error {
 	// 检查是否有randomKey
-	randKeyPath := filepath.Join("..", "wallet", "randomKey")
+	randKeyPath := filepath.Join(".", "wallet", "randomKey")
 	randKeyExist := utils.FileExist(filepath.Clean(randKeyPath))
 	if randKeyExist {
 		fmt.Println("加载随机密钥中...")
@@ -91,6 +91,11 @@ func loadKeys(user *model.User) error {
 	user.PubKeyB = public
 	// 生成公钥地址
 	user.Address, err = key.CalcPubAddress(user.PubKeyB.X, user.PubKeyB.Y)
+	if err != nil {
+		return err
+	}
+	// 生成共享通道
+	user.ShareC, err = key.CalcChannel(user)
 	if err != nil {
 		return err
 	}
@@ -144,8 +149,90 @@ func uploadCMD(user *model.User) error { // 上传数据
 }
 
 // query 指令
-func queryCMD() error {
+func queryCMD(user *model.User) error {
+	params := url.Values{}
+	URL, _ := url.Parse("http://127.0.0.1:8080/query_pri")
+	params.Set("key", user.Address)
+	URL.RawQuery = params.Encode()
+	urlPath := URL.String()
+	resp, err := http.Get(urlPath)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	body, _ := ioutil.ReadAll(resp.Body)
+	fmt.Println("查询结果：" + string(body))
 	return nil
+}
+
+// clear 指令
+func clearCMD(user *model.User) error {
+	fmt.Println("删除旧密钥中...")
+	_ = os.Remove("keyA.pem")
+	_ = os.Remove("keyB.pem")
+	_ = os.Remove("pub_keyA.pem")
+	_ = os.Remove("pub_keyB.pem")
+	_ = os.Remove("randomKey")
+	fmt.Println("生成新密钥中...")
+	err := key.Enroll(user)
+	if err != nil {
+		return err
+	}
+	fmt.Println("新密钥生成完成！")
+	return nil
+}
+
+// channel指令
+func channelCMD(user *model.User) error {
+	// 打印aB
+	fmt.Println("我的共享通道是：")
+	fmt.Printf("X:%x\nY:%x\n", user.ShareC.X, user.ShareC.Y)
+	return nil
+}
+
+// share指令
+func shareCMD(user *model.User) error {
+	var pubXstr, pubYstr, scXstr, scYstr string
+	fmt.Printf("请输入对方的身份验证公钥：\nPublic Key X:")
+	fmt.Scan(&pubXstr)
+	fmt.Printf("Public Key Y:")
+	fmt.Scan(&pubYstr)
+	fmt.Printf("请输入对方的共享通道：\nShare Channel X:")
+	fmt.Scan(&scXstr)
+	fmt.Printf("Share Channel Y:")
+	fmt.Scan(&scYstr)
+	sc := &model.ShareChannel{}
+	sc.PubX, _ = new(big.Int).SetString(pubXstr, 16)
+	sc.PubY, _ = new(big.Int).SetString(pubYstr, 16)
+	sc.X, _ = new(big.Int).SetString(scXstr, 16)
+	sc.Y, _ = new(big.Int).SetString(scXstr, 16)
+	// 生成密钥差值
+	// KX, KY, err := key.CalcK(sc, user)
+	// 计算一次性地址
+	// 打包POST请求
+	return nil
+}
+
+// 执行指令
+func execCMD(cmd string, user *model.User) (err error) {
+	switch cmd {
+	case "exit": // 退出
+		fmt.Println("Bye.")
+	case "query": // 查询
+		err = queryCMD(user)
+	case "upload": // 上传
+		err = uploadCMD(user)
+	case "clear": // 清空
+		err = clearCMD(user)
+	case "channel": // 分享共享通道
+		err = channelCMD(user)
+	case "share":
+		//err = shareCMD()
+	default:
+		fmt.Println("Undefined command: " + cmd)
+	}
+
+	return err
 }
 
 func main() {
@@ -169,74 +256,10 @@ func main() {
 	for {
 		fmt.Printf("CMD> ")
 		fmt.Scan(&command)
-		if command == "exit" {
-			fmt.Println("Bye.")
+		err := execCMD(command, user)
+		if err != nil {
+			fmt.Println(err.Error())
 			return
-		} else if command == "upload" {
-
-		} else if command == "data" {
-			// 查询数据
-			params := url.Values{}
-			Url, _ := url.Parse("http://127.0.0.1:8080/query_pri")
-			params.Set("key", user1.address)
-			Url.RawQuery = params.Encode()
-			urlPath := Url.String()
-			resp, err := http.Get(urlPath)
-			if err != nil {
-				fmt.Println(err.Error())
-				return
-			}
-			defer resp.Body.Close()
-			body, _ := ioutil.ReadAll(resp.Body)
-			fmt.Println("查询结果：" + string(body))
-		} else if command == "clear" {
-			// 清除数据
-			fmt.Println("删除旧密钥中...")
-			err := os.Remove("keyA.pem")
-			err = os.Remove("keyB.pem")
-			err = os.Remove("pub_keyA.pem")
-			err = os.Remove("pub_keyB.pem")
-			err = os.Remove("randomKey")
-			fmt.Println("生成新密钥中...")
-			user1, err = enroll()
-			if err != nil {
-				fmt.Printf("%s", err.Error())
-				return
-			}
-			fmt.Println("新密钥生成完成！")
-		} else if command == "sharetome" {
-			// 打印共享通道aB
-			curve := elliptic.P256()
-			shareX, shareY := curve.ScalarMult(user1.B.X, user1.B.Y, user1.a.D.Bytes())
-			fmt.Println("我的共享通道是：")
-			fmt.Printf("X:%x\nY:%x\n", shareX, shareY)
-		} else if command == "shareto" {
-			// 向其他人share
-		} else if command == "getshare" {
-
-		} else {
-			fmt.Println("Undefined command: " + command)
 		}
 	}
-	/*
-		// 生成加密数据 (16进制字符串)
-		cipherX, cipherY := encrypt(&user1)
-		fmt.Printf("CX:%s\nCY:%s\n", cipherX, cipherY)
-
-		// 计算地址
-		pubAddress, err2 := genAddress(user1.B.X, user1.B.Y)
-		if err2 != nil {
-			fmt.Printf("genKey error %s", err2.Error())
-			return
-		}
-		fmt.Printf("PublicAddress: %s\n", pubAddress)
-
-		// 打包签名
-		cipBytes := packData(cipherX, cipherY)
-		sign, err := eccSign(cipBytes, &user1)
-		if err != nil {
-			fmt.Printf(err.Error())
-			return
-		}
-		fmt.Printf("Sgin: %s\n", string(sign))*/
 }

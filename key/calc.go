@@ -60,11 +60,11 @@ func CalcPubAddress(pubX, pubY *big.Int) (string, error) {
 }
 
 // CalcK 计算密钥差值
-func CalcK(sc *model.ShareChannel, user *model.User) (KX, KY *big.Int, err error) {
+func CalcK(sc *model.ShareChannel, user *model.User) (KX, KY, RX, RY, r *big.Int, err error) {
 	curve := elliptic.P256()
 	// 生成新的随机密钥
-	r, _ := rand.Int(rand.Reader, curve.Params().N)
-	RX, RY := curve.ScalarBaseMult(r.Bytes())
+	r, _ = rand.Int(rand.Reader, curve.Params().N)
+	RX, RY = curve.ScalarBaseMult(r.Bytes())
 
 	tmpX, tmpY := curve.ScalarMult(sc.PubX, sc.PubY, r.Bytes()) // r'E
 	tmpX, tmpY = curve.Add(tmpX, tmpY, sc.X, sc.Y)              // dE+r'E
@@ -73,7 +73,7 @@ func CalcK(sc *model.ShareChannel, user *model.User) (KX, KY *big.Int, err error
 	tmpX1, tmpY1 = curve.ScalarMult(tmpX1, tmpY1, user.PriKeyB.D.Bytes()) // b(A+R1)
 	KX, KY = minus(curve, tmpX, tmpY, tmpX1, tmpY1)                       // K=dE+r2E-b(A+R1)
 
-	return KX, KY, err
+	return KX, KY, RX, RY, r, err
 }
 
 // CalcChannel 计算共享通道
@@ -89,8 +89,18 @@ func CalcChannel(user *model.User) (*model.ShareChannel, error) {
 	return shareC, nil
 }
 
-// CalcOneKey 计算一次性密钥P
-func CalcOneKey(RXStr, RYStr string, user *model.User) (*big.Int, *big.Int, error) {
+// CalcOneKey1 计算一次性密钥P
+func CalcOneKey1(r *big.Int, user *model.User) (*big.Int, *big.Int, error) {
+	curve := elliptic.P256()
+	tmpX, tmpY := curve.ScalarMult(user.PubKeyA.X, user.PubKeyA.Y, r.Bytes())
+	has := md5.New().Sum(tmpX.Bytes()) //hash md5(r2D)
+	tmpX, tmpY = curve.ScalarBaseMult(has)
+	PX, PY := curve.Add(tmpX, tmpY, user.PubKeyB.X, user.PubKeyB.Y)
+	return PX, PY, nil
+}
+
+// CalcOneKey2 计算一次性密钥P'
+func CalcOneKey2(RXStr, RYStr string, user *model.User) (*big.Int, *big.Int, error) {
 	curve := elliptic.P256()
 	RX, _ := new(big.Int).SetString(RXStr, 16)
 	RY, _ := new(big.Int).SetString(RYStr, 16)

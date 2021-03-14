@@ -16,6 +16,8 @@ import (
 	"time"
 )
 
+var baseURL string
+
 // 本地密钥初始化
 func initKeys(user *model.User) error {
 	// 检查是否有公钥
@@ -34,7 +36,7 @@ func initKeys(user *model.User) error {
 	} else {
 		// 路径不存在 生成user
 		fmt.Println("未检测到密钥，生成密钥中...")
-		err := key.Enroll(user)
+		err := key.Enroll(user, filepath.Join(".", "wallet"))
 		if err != nil {
 			return err
 		}
@@ -66,25 +68,29 @@ func initRandKey(user *model.User) error {
 // 加载绑定密钥
 func loadKeys(user *model.User) error {
 	// 加载私钥a
-	private, err := key.LoadPriKey("keyA.pem")
+	priAPath := filepath.Join(".", "wallet", "keyA.pem")
+	private, err := key.LoadPriKey(filepath.Clean(priAPath))
 	if err != nil {
 		return err
 	}
 	user.PriKeyA = private
 	// 加载公钥A
-	public, err := key.LoadPubKey("pub_keyA.pem")
+	pubAPath := filepath.Join(".", "wallet", "pub_keyA.pem")
+	public, err := key.LoadPubKey(filepath.Clean(pubAPath))
 	if err != nil {
 		return err
 	}
 	user.PubKeyA = public
 	// 加载私钥b
-	private, err = key.LoadPriKey("keyB.pem")
+	priBPath := filepath.Join(".", "wallet", "keyB.pem")
+	private, err = key.LoadPriKey(filepath.Clean(priBPath))
 	if err != nil {
 		return err
 	}
 	user.PriKeyB = private
 	// 加载公钥B
-	public, err = key.LoadPubKey("pub_keyB.pem")
+	pubBPath := filepath.Join(".", "wallet", "pub_keyB.pem")
+	public, err = key.LoadPubKey(filepath.Clean(pubBPath))
 	if err != nil {
 		return err
 	}
@@ -112,12 +118,12 @@ func uploadCMD(user *model.User) error { // 上传数据
 	MX = "7d7ceaec3a16205c72922b8b8e6e4e1ec4f9da3c83593cfc40ae64a0f350b5ca" // 默认数据
 	MY = "63f2e1082ddc6d754e0d2b7554ea929cebd03a5ee1655e72023b51876aa24441"
 	// 数据加密
-	CX, CY, RX, RY, err := ecc.Encrypt(user, MX, MY)
+	CXStr, CYStr, RXStr, RYStr, rStr, err := ecc.Encrypt(user, MX, MY)
 	if err != nil {
 		return err
 	}
 	// 数据签名
-	sign, err := ecc.Sign(user, CX, CY)
+	sign, err := ecc.Sign(user, CXStr, CYStr)
 	if err != nil {
 		return err
 	}
@@ -125,25 +131,30 @@ func uploadCMD(user *model.User) error { // 上传数据
 	timeStamp := strconv.FormatInt(time.Now().UnixNano(), 10)
 	// 封装POST请求参数
 	urlValues := url.Values{}
-	pubX := fmt.Sprintf("%x", user.PubKeyB.X)
-	pubY := fmt.Sprintf("%x", user.PubKeyB.Y)
-	urlValues.Add("pubX", pubX)
-	urlValues.Add("pubY", pubY)
-	urlValues.Add("rX", RX)
-	urlValues.Add("rY", RY)
-	urlValues.Add("cipX", CX)
-	urlValues.Add("cipY", CY)
+	pubXStr := fmt.Sprintf("%x", user.PubKeyB.X)
+	pubYStr := fmt.Sprintf("%x", user.PubKeyB.Y)
+	urlValues.Add("pubX", pubXStr)
+	urlValues.Add("pubY", pubYStr)
+	urlValues.Add("rX", RXStr)
+	urlValues.Add("rY", RYStr)
+	urlValues.Add("cipX", CXStr)
+	urlValues.Add("cipY", CYStr)
 	urlValues.Add("time", timeStamp)
 	urlValues.Add("sign", sign)
 	// 发送FormData的POST请求
-	resp, err := http.PostForm("http://127.0.0.1:8080/upload_pri", urlValues)
+	resp, err := http.PostForm(baseURL+"/upload_pri", urlValues)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 	// 解析结果
 	body, _ := ioutil.ReadAll(resp.Body)
-	fmt.Println(string(body))
+	if string(body)[0:5] == "10000" {
+		key.StoreRandKey(rStr, RXStr, RYStr, user, filepath.Join(".", "wallet", "randomKey"))
+		fmt.Println("上传成功")
+	} else {
+		fmt.Println("上传失败")
+	}
 
 	return nil
 }
@@ -151,7 +162,7 @@ func uploadCMD(user *model.User) error { // 上传数据
 // query 指令
 func queryCMD(user *model.User) error {
 	params := url.Values{}
-	URL, _ := url.Parse("http://127.0.0.1:8080/query_pri")
+	URL, _ := url.Parse(baseURL + "/query_pri")
 	params.Set("key", user.Address)
 	URL.RawQuery = params.Encode()
 	urlPath := URL.String()
@@ -168,13 +179,13 @@ func queryCMD(user *model.User) error {
 // clear 指令
 func clearCMD(user *model.User) error {
 	fmt.Println("删除旧密钥中...")
-	_ = os.Remove("keyA.pem")
-	_ = os.Remove("keyB.pem")
-	_ = os.Remove("pub_keyA.pem")
-	_ = os.Remove("pub_keyB.pem")
-	_ = os.Remove("randomKey")
+	_ = os.Remove("wallet/keyA.pem")
+	_ = os.Remove("wallet/keyB.pem")
+	_ = os.Remove("wallet/pub_keyA.pem")
+	_ = os.Remove("wallet/pub_keyB.pem")
+	_ = os.Remove("wallet/randomKey")
 	fmt.Println("生成新密钥中...")
-	err := key.Enroll(user)
+	err := key.Enroll(user, filepath.Join(".", "wallet"))
 	if err != nil {
 		return err
 	}
@@ -213,6 +224,40 @@ func shareCMD(user *model.User) error {
 	return nil
 }
 
+// get 指令
+func getCMD(user *model.User) error {
+	var RX, RY string
+	fmt.Printf("请输入随机密钥:\nX:")
+	fmt.Scan(&RX)
+	fmt.Printf("Y:")
+	fmt.Scan(&RY)
+	// 计算一次性密钥
+	PX, PY, err := key.CalcOneKey(RX, RY, user)
+	if err != nil {
+		return err
+	}
+	// 生成地址
+	add, err := key.CalcPubAddress(PX, PY)
+	if err != nil {
+		return err
+	}
+	// 查询
+	params := url.Values{}
+	URL, _ := url.Parse(baseURL + "/query_pub")
+	params.Set("key", add)
+	URL.RawQuery = params.Encode()
+	urlPath := URL.String()
+	resp, err := http.Get(urlPath)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	body, _ := ioutil.ReadAll(resp.Body)
+	fmt.Println("查询结果：" + string(body))
+
+	return nil
+}
+
 // 执行指令
 func execCMD(cmd string, user *model.User) (err error) {
 	switch cmd {
@@ -228,14 +273,17 @@ func execCMD(cmd string, user *model.User) (err error) {
 		err = channelCMD(user)
 	case "share":
 		//err = shareCMD()
+	case "get": // 从公开链查询
+		err = getCMD(user)
 	default:
-		fmt.Println("Undefined command: " + cmd)
+		fmt.Printf("Undefined command: %s\n" + cmd)
 	}
 
 	return err
 }
 
 func main() {
+	baseURL = "http://202.120.39.13:51203"
 	// 绑定用户内存
 	user := &model.User{}
 	// 密钥初始化

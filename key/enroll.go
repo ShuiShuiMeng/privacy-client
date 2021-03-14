@@ -8,7 +8,7 @@ import (
 )
 
 // Enroll 注册用户
-func Enroll(user *model.User) error {
+func Enroll(user *model.User, path string) error {
 	// 生成 a，A
 	curve := elliptic.P256()
 	private, err := ecdsa.GenerateKey(curve, rand.Reader)
@@ -18,7 +18,7 @@ func Enroll(user *model.User) error {
 	user.PriKeyA = private
 	user.PubKeyA = &private.PublicKey
 	// 存储到文件中
-	err = StoreKey(private, "A")
+	err = StoreKey(private, "A", path)
 	if err != nil {
 		return err
 	}
@@ -30,7 +30,7 @@ func Enroll(user *model.User) error {
 	user.PriKeyB = private
 	user.PubKeyB = &private.PublicKey
 	// 存储到文件中
-	err = StoreKey(private, "B")
+	err = StoreKey(private, "B", path)
 	if err != nil {
 		return err
 	}

@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/x509"
 	"encoding/pem"
-	"fmt"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -13,23 +12,15 @@ import (
 )
 
 // StoreKey 密钥存储到文件
-func StoreKey(private *ecdsa.PrivateKey, name string) error {
+func StoreKey(private *ecdsa.PrivateKey, name, path string) error {
 	// 存储私钥文件
-	priKeyPath := filepath.Join(
-		".",
-		"wallet",
-		"key"+name+".pem",
-	)
+	priKeyPath := filepath.Join(path, "key"+name+".pem")
 	privateFile, err := os.OpenFile(filepath.Clean(priKeyPath), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0766)
 	if err != nil {
 		return err
 	}
 	// 存储公钥文件
-	pubKeyPath := filepath.Join(
-		".",
-		"wallet",
-		"pub_key"+name+".pem",
-	)
+	pubKeyPath := filepath.Join(path, "pub_key"+name+".pem")
 	publicFile, err := os.OpenFile(filepath.Clean(pubKeyPath), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0766)
 	if err != nil {
 		return err
@@ -93,17 +84,15 @@ func LoadPubKey(path string) (*ecdsa.PublicKey, error) {
 	return publicKey, nil
 }
 
-// SaveRandKey 随机密钥保存
-func SaveRandKey(r, RX, RY *big.Int, user *model.User) error {
+// StoreRandKey 随机密钥保存
+func StoreRandKey(rStr, RXStr, RYStr string, user *model.User, path string) error {
 	// 随机密钥写入内存,深拷贝
-	user.RandKey = &model.RandomKey{
-		D: new(big.Int).Set(r),
-		X: new(big.Int).Set(RX),
-		Y: new(big.Int).Set(RY),
-	}
+	r, _ := new(big.Int).SetString(rStr, 16)
+	RX, _ := new(big.Int).SetString(RXStr, 16)
+	RY, _ := new(big.Int).SetString(RYStr, 16)
+	user.RandKey = &model.RandomKey{D: r, X: RX, Y: RY}
 	// 保存至文件
-	randKeyPath := filepath.Join(".", "wallet", "randomKey")
-	file, err := os.Create(filepath.Clean(randKeyPath))
+	file, err := os.Create(filepath.Clean(path))
 	if err != nil {
 		return err
 	}
@@ -111,12 +100,9 @@ func SaveRandKey(r, RX, RY *big.Int, user *model.User) error {
 	writer := bufio.NewWriter(file)
 
 	// 写入r
-	rStr := fmt.Sprintf("%x", r)
 	writer.WriteString(rStr)
 	writer.WriteString("\n")
 	// 写入RX
-	RXStr := fmt.Sprintf("%x", RX)
-	RYStr := fmt.Sprintf("%x", RY)
 	writer.WriteString(RXStr)
 	writer.WriteString("\n")
 	// 写入RY

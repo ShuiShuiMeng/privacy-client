@@ -2,6 +2,7 @@ package key
 
 import (
 	"crypto/elliptic"
+	"crypto/md5"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -86,4 +87,16 @@ func CalcChannel(user *model.User) (*model.ShareChannel, error) {
 		PubY: user.PubKeyB.Y,
 	}
 	return shareC, nil
+}
+
+// CalcOneKey 计算一次性密钥P
+func CalcOneKey(RXStr, RYStr string, user *model.User) (*big.Int, *big.Int, error) {
+	curve := elliptic.P256()
+	RX, _ := new(big.Int).SetString(RXStr, 16)
+	RY, _ := new(big.Int).SetString(RYStr, 16)
+	tmpX, tmpY := curve.ScalarMult(RX, RY, user.PriKeyA.D.Bytes())
+	has := md5.New().Sum(tmpX.Bytes()) //hash md5(dR2)
+	tmpX, tmpY = curve.ScalarBaseMult(has)
+	PX, PY := curve.Add(tmpX, tmpY, user.PubKeyB.X, user.PubKeyB.Y)
+	return PX, PY, nil
 }

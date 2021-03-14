@@ -133,3 +133,8 @@ func LoadRandKey(user *model.User, path string) error {
 
 	return nil
 }
+
+// StoreShareRecord 存储分享记录
+func StoreShareRecord(pubXStr, pubYStr, RXStr, RYStr, rStr string, user *model.User, path string) error {
+	return nil
+}

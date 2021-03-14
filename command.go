@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"privacy-client/ecc"
 	"privacy-client/key"
 	"privacy-client/model"
 	"strconv"
@@ -29,7 +30,7 @@ func uploadCMD(user *model.User) error { // 上传数据
 		return err
 	}
 	// 数据签名
-	sign, err := ecc.Sign(user, CXStr, CYStr)
+	sign, err := ecc.Sign(user, CXStr+CYStr)
 	if err != nil {
 		return err
 	}
@@ -128,12 +129,50 @@ func shareCMD(user *model.User) error {
 	if err != nil {
 		return err
 	}
-	// 计算一次性地址
+	KXStr := fmt.Sprint("%x", KX)
+	KYStr := fmt.Sprint("%x", KY)
+	RXStr := fmt.Sprint("%x", RX)
+	RYStr := fmt.Sprint("%x", RY)
+	rStr := fmt.Sprint("%x", r)
+	// 计算一次性密钥
 	PX, PY, err := key.CalcOneKey1(r, user)
 	if err != nil {
 		return err
 	}
-	// 打包POST请求
+	PXStr := fmt.Sprint("%x", PX)
+	PYStr := fmt.Sprint("%x", PY)
+	// 生成签名
+	sign, err := ecc.Sign(user, KXStr+KYStr+PXStr+PYStr)
+	// 生成时间戳 纳秒级
+	timeStamp := strconv.FormatInt(time.Now().UnixNano(), 10)
+	// 封装POST请求参数
+	urlValues := url.Values{}
+	pubXStr := fmt.Sprintf("%x", user.PubKeyB.X)
+	pubYStr := fmt.Sprintf("%x", user.PubKeyB.Y)
+	urlValues.Add("pubX", pubXStr)
+	urlValues.Add("pubY", pubYStr)
+	urlValues.Add("rX", RXStr)
+	urlValues.Add("rY", RYStr)
+	urlValues.Add("kX", KXStr)
+	urlValues.Add("kY", KYStr)
+	urlValues.Add("pX", PXStr)
+	urlValues.Add("pY", PYStr)
+	urlValues.Add("time", timeStamp)
+	urlValues.Add("sign", sign)
+	// 发送POST请求
+	resp, err := http.PostForm(baseURL+"/share_data", urlValues)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	// 解析结果
+	body, _ := ioutil.ReadAll(resp.Body)
+	if string(body)[0:5] == "10000" {
+		key.StoreShareRecord(pubXStr, pubYStr, RXStr, RYStr, rStr, user, filepath.Join(".", "wallet", "randomKey"))
+		fmt.Println("共享成功")
+	} else {
+		fmt.Println("上传失败")
+	}
 	return nil
 }
 

@@ -9,12 +9,9 @@ import (
 )
 
 // Sign 生成签名
-func Sign(user *model.User, CX, CY string) (sign string, err error) {
+func Sign(user *model.User, C string) (sign string, err error) {
 	// 打包数据
-	var CBytes bytes.Buffer
-	CBytes.Write([]byte(CX))
-	CBytes.Write([]byte(CY))
-	pt := CBytes.Bytes()
+	pt := []byte(C)
 	// 根据明文plaintext和私钥，生成两个big.Ing
 	r, s, err := ecdsa.Sign(rand.Reader, user.PriKeyB, pt)
 	if err != nil {

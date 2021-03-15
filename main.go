@@ -3,12 +3,11 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"privacy-client/cmd"
 	"privacy-client/key"
 	"privacy-client/model"
 	"privacy-client/utils"
 )
-
-var baseURL string
 
 // 本地密钥初始化
 func initKeys(user *model.User) error {
@@ -101,7 +100,6 @@ func loadKeys(user *model.User) error {
 }
 
 func main() {
-	baseURL = "http://202.120.39.13:51203"
 	// 绑定用户内存
 	user := &model.User{}
 	// 密钥初始化
@@ -122,7 +120,7 @@ func main() {
 	for {
 		fmt.Printf("CMD> ")
 		fmt.Scan(&command)
-		err := ExecCMD(command, user)
+		err := cmd.ExecCMD(command, user)
 		if err != nil {
 			fmt.Println(err.Error())
 			return

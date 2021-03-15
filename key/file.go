@@ -115,17 +115,24 @@ func StoreRandKey(rStr, RXStr, RYStr string, user *model.User, path string) erro
 
 // LoadRandKey 加载随机密钥
 func LoadRandKey(user *model.User, path string) error {
-	file, err := os.Open(filepath.Clean(path))
+	file, err := os.OpenFile(filepath.Clean(path), os.O_RDONLY, 0666)
 	if err == nil {
 		rd := bufio.NewReader(file)
 		// 加载r RX RY
 		rStr, _ := rd.ReadString('\n')
+		rStr = rStr[:len(rStr)-1]
 		r, _ := new(big.Int).SetString(rStr, 16)
 		RXStr, _ := rd.ReadString('\n')
+		RXStr = RXStr[:len(RXStr)-1]
 		RX, _ := new(big.Int).SetString(RXStr, 16)
 		RYStr, _ := rd.ReadString('\n')
+		RYStr = RYStr[:len(RYStr)-1]
 		RY, _ := new(big.Int).SetString(RYStr, 16)
-		user.RandKey = &model.RandomKey{D: r, X: RX, Y: RY}
+		user.RandKey = &model.RandomKey{
+			D: new(big.Int).Set(r),
+			X: new(big.Int).Set(RX),
+			Y: new(big.Int).Set(RY),
+		}
 	} else {
 		return err
 	}
@@ -135,6 +142,25 @@ func LoadRandKey(user *model.User, path string) error {
 }
 
 // StoreShareRecord 存储分享记录
-func StoreShareRecord(pubXStr, pubYStr, RXStr, RYStr, rStr string, user *model.User, path string) error {
+func StoreShareRecord(scStr *model.ShareChannelStr, RXStr, RYStr, rStr, add string, user *model.User, path string) error {
+	// 判断文件是否存在
+	file, err := os.OpenFile(filepath.Clean(path), os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	// 存储
+	writer := bufio.NewWriter(file)
+	writer.WriteString("---------分享记录---------\n")
+	writer.WriteString("加密公钥X " + scStr.AXStr + "\n")
+	writer.WriteString("加密公钥Y " + scStr.AYStr + "\n")
+	writer.WriteString("身份公钥X " + scStr.BXStr + "\n")
+	writer.WriteString("身份公钥Y " + scStr.BYStr + "\n")
+	writer.WriteString("随机公钥X " + RXStr + "\n")
+	writer.WriteString("随机公钥Y " + RYStr + "\n")
+	writer.WriteString("随机私钥  " + rStr + "\n")
+	writer.WriteString("一次性地址 " + add + "\n")
+	writer.WriteString("-------------------------\n")
+	writer.Flush()
 	return nil
 }

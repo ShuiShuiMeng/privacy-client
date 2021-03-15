@@ -66,12 +66,13 @@ func CalcK(sc *model.ShareChannel, user *model.User) (KX, KY, RX, RY, r *big.Int
 	r, _ = rand.Int(rand.Reader, curve.Params().N)
 	RX, RY = curve.ScalarBaseMult(r.Bytes())
 
-	tmpX, tmpY := curve.ScalarMult(sc.PubX, sc.PubY, r.Bytes()) // r'E
-	tmpX, tmpY = curve.Add(tmpX, tmpY, sc.X, sc.Y)              // dE+r'E
+	tmpX, tmpY := curve.ScalarMult(sc.BX, sc.BY, r.Bytes()) // r'E
+	tmpX, tmpY = curve.Add(tmpX, tmpY, sc.X, sc.Y)          // dE+r'E
 
-	tmpX1, tmpY1 := curve.Add(user.PubKeyA.X, user.PubKeyA.Y, RX, RY)     // A+R1
-	tmpX1, tmpY1 = curve.ScalarMult(tmpX1, tmpY1, user.PriKeyB.D.Bytes()) // b(A+R1)
-	KX, KY = minus(curve, tmpX, tmpY, tmpX1, tmpY1)                       // K=dE+r2E-b(A+R1)
+	tmpX1, tmpY1 := curve.Add(user.PubKeyA.X, user.PubKeyA.Y, user.RandKey.X, user.RandKey.Y) // A+R1
+	tmpX1, tmpY1 = curve.ScalarMult(tmpX1, tmpY1, user.PriKeyB.D.Bytes())                     // b(A+R1)
+
+	KX, KY = minus(curve, tmpX, tmpY, tmpX1, tmpY1) // K=dE+r2E-b(A+R1)
 
 	return KX, KY, RX, RY, r, err
 }
@@ -81,21 +82,23 @@ func CalcChannel(user *model.User) (*model.ShareChannel, error) {
 	curve := elliptic.P256()
 	shareX, shareY := curve.ScalarMult(user.PubKeyB.X, user.PubKeyB.Y, user.PriKeyA.D.Bytes())
 	shareC := &model.ShareChannel{
-		X:    shareX,
-		Y:    shareY,
-		PubX: user.PubKeyB.X,
-		PubY: user.PubKeyB.Y,
+		X:  shareX,
+		Y:  shareY,
+		AX: user.PubKeyA.X,
+		AY: user.PubKeyA.Y,
+		BX: user.PubKeyB.X,
+		BY: user.PubKeyB.Y,
 	}
 	return shareC, nil
 }
 
 // CalcOneKey1 计算一次性密钥P
-func CalcOneKey1(r *big.Int, user *model.User) (*big.Int, *big.Int, error) {
+func CalcOneKey1(r *big.Int, sc *model.ShareChannel) (*big.Int, *big.Int, error) {
 	curve := elliptic.P256()
-	tmpX, tmpY := curve.ScalarMult(user.PubKeyA.X, user.PubKeyA.Y, r.Bytes())
+	tmpX, tmpY := curve.ScalarMult(sc.AX, sc.AY, r.Bytes())
 	has := md5.New().Sum(tmpX.Bytes()) //hash md5(r2D)
 	tmpX, tmpY = curve.ScalarBaseMult(has)
-	PX, PY := curve.Add(tmpX, tmpY, user.PubKeyB.X, user.PubKeyB.Y)
+	PX, PY := curve.Add(tmpX, tmpY, sc.BX, sc.BY)
 	return PX, PY, nil
 }
 
@@ -109,4 +112,20 @@ func CalcOneKey2(RXStr, RYStr string, user *model.User) (*big.Int, *big.Int, err
 	tmpX, tmpY = curve.ScalarBaseMult(has)
 	PX, PY := curve.Add(tmpX, tmpY, user.PubKeyB.X, user.PubKeyB.Y)
 	return PX, PY, nil
+}
+
+// CalcSender 计算发送者信息
+func CalcSender(time string, user *model.User) (string, error) {
+	BXStr := fmt.Sprintf("%x", user.PubKeyB.X)
+	BYStr := fmt.Sprintf("%x", user.PubKeyB.Y)
+
+	str := BXStr + BYStr + time
+	// 转换
+	hashBytes := sha256.Sum256([]byte(str))
+	hashStr := hex.EncodeToString(hashBytes[:])
+
+	// fmt.Println(str)
+	// fmt.Println(hashStr)
+
+	return hashStr, nil
 }

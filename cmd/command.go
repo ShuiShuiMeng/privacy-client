@@ -308,40 +308,7 @@ func deleteCMD(user *model.User) error {
 }
 
 func testCMD(user *model.User) error {
-	/*addfile, _ := os.OpenFile("adds.txt", os.O_RDONLY, 0666)
-	sfile, _ := os.OpenFile("signs.txt", os.O_WRONLY|os.O_APPEND, 0666)
-	defer addfile.Close()
-	defer sfile.Close()
-
-	writer := bufio.NewWriter(sfile)
-	reader := bufio.NewReader(addfile)
-
-	for {
-		add, err := reader.ReadString('\n')
-		if err != nil {
-			break
-		}
-		add = add[:len(add)-1]
-		tmp, _ := ecc.Sign(user, add)
-
-		writer.WriteString(tmp + "\n")
-		writer.Flush()
-	}*/
-	params := url.Values{}
-	URL, _ := url.Parse(baseURL + "/test_delete")
-	params.Set("add", "GueYJ59CHZMUcSYmDV4ZbVoNSwRg8N27P")
-	params.Set("sign", "68712359051111179998841857927774912670242063684864021999939604057500688059844+79921760530000745534193209980515714551791533282790977676996117720435900785400")
-	URL.RawQuery = params.Encode()
-	urlPath := URL.String()
-	resp, err := http.Get(urlPath)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	body, _ := ioutil.ReadAll(resp.Body)
-	fmt.Println("结果：" + string(body))
-
-	return nil 
+	return nil
 }
 
 // ExecCMD 执行指令

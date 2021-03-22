@@ -2,4 +2,5 @@ wallet/*
 
 main
 
-adds.txt
+adds*.txt
+signs*.txt
